@@ -1,0 +1,961 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Digimon UP 総合ダメージシミュレーター</title>
+  <!-- Tesseract.js for in-browser client-side OCR -->
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  <style>
+    :root {
+      --bg-color: #080e1e;
+      --card-bg: #131d36;
+      --card-inner: #0a1124;
+      --accent-blue: #2563eb;
+      --accent-cyan: #06b6d4;
+      --accent-gold: #f59e0b;
+      --accent-green: #10b981;
+      --accent-purple: #a855f7;
+      --accent-red: #ef4444;
+      --text-main: #f8fafc;
+      --text-sub: #94a3b8;
+      --border-color: #1e293b;
+      --self-color: #10b981;
+      --enemy-color: #f97316;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      padding: 12px;
+      padding-bottom: 40px;
+    }
+
+    .container {
+      max-width: 680px;
+      margin: 0 auto;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 14px;
+      padding: 8px 0;
+    }
+
+    header h1 {
+      font-size: 1.25rem;
+      color: var(--accent-cyan);
+      letter-spacing: 0.5px;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border-radius: 12px;
+      padding: 12px;
+      margin-bottom: 12px;
+      border: 1px solid var(--border-color);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.35);
+    }
+
+    .card-title {
+      font-size: 0.9rem;
+      font-weight: bold;
+      color: var(--accent-cyan);
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    /* OCR Upload Area */
+    .upload-box {
+      border: 2px dashed #334155;
+      border-radius: 8px;
+      padding: 12px;
+      text-align: center;
+      cursor: pointer;
+      background: rgba(37, 99, 235, 0.05);
+      transition: all 0.2s ease;
+    }
+
+    .upload-box:active {
+      background: rgba(37, 99, 235, 0.15);
+    }
+
+    .upload-box input {
+      display: none;
+    }
+
+    .upload-btn {
+      display: inline-block;
+      background: var(--accent-blue);
+      color: white;
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-weight: bold;
+      margin-top: 4px;
+      cursor: pointer;
+      border: none;
+    }
+
+    .progress-bar {
+      width: 100%;
+      height: 5px;
+      background: #1e293b;
+      border-radius: 3px;
+      overflow: hidden;
+      margin-top: 6px;
+      display: none;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      width: 0%;
+      background: var(--accent-cyan);
+      transition: width 0.2s ease;
+    }
+
+    /* 5 Skill Card Slots Grid */
+    .skill-slots-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 6px;
+      margin-top: 8px;
+    }
+
+    @media (max-width: 480px) {
+      .skill-slots-grid {
+        grid-template-columns: repeat(5, 1fr);
+        gap: 4px;
+      }
+    }
+
+    .skill-slot {
+      background: var(--card-inner);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 6px 4px;
+      text-align: center;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .skill-slot-header {
+      font-size: 0.7rem;
+      font-weight: bold;
+      color: var(--text-sub);
+      margin-bottom: 4px;
+    }
+
+    .card-preview-box {
+      width: 100%;
+      aspect-ratio: 3/4;
+      background: #060a14;
+      border-radius: 4px;
+      border: 1px dashed #334155;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .card-preview-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .card-preview-placeholder {
+      font-size: 0.65rem;
+      color: #64748b;
+      line-height: 1.1;
+      padding: 2px;
+    }
+
+    .skill-val-input {
+      width: 100%;
+      background: #0f172a;
+      border: 1px solid var(--border-color);
+      color: var(--accent-gold);
+      font-weight: bold;
+      padding: 3px 2px;
+      border-radius: 4px;
+      font-size: 0.72rem;
+      text-align: center;
+      margin-top: 4px;
+    }
+
+    .skill-val-input:focus {
+      border-color: var(--accent-cyan);
+      outline: none;
+    }
+
+    .card-name-input {
+      width: 100%;
+      background: transparent;
+      border: none;
+      color: var(--text-main);
+      font-size: 0.65rem;
+      text-align: center;
+      margin-top: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .card-name-input:focus {
+      outline: 1px solid var(--accent-cyan);
+      border-radius: 2px;
+      background: #0f172a;
+    }
+
+    /* Attack Mode Simulation Grid */
+    .attack-types-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    @media (min-width: 520px) {
+      .attack-types-grid {
+        grid-template-columns: 1fr 1fr 1fr;
+      }
+    }
+
+    .attack-card {
+      background: var(--card-inner);
+      border-radius: 8px;
+      padding: 10px;
+      border-left: 4px solid var(--accent-blue);
+    }
+
+    .attack-card.normal { border-left-color: var(--accent-green); }
+    .attack-card.combo { border-left-color: var(--accent-gold); }
+    .attack-card.counter { border-left-color: var(--accent-purple); }
+
+    .attack-card-header {
+      font-size: 0.8rem;
+      font-weight: bold;
+      color: var(--text-main);
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 4px;
+    }
+
+    .attack-card-dmg {
+      font-size: 1.15rem;
+      font-weight: bold;
+      color: #fff;
+    }
+
+    .attack-card-sub {
+      font-size: 0.7rem;
+      color: var(--text-sub);
+      margin-top: 4px;
+      line-height: 1.4;
+    }
+
+    /* Result Sections */
+    .result-section {
+      background: var(--card-inner);
+      border-radius: 8px;
+      padding: 10px;
+      margin-top: 8px;
+    }
+
+    .result-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+
+    .result-dmg-val {
+      font-size: 1.25rem;
+      font-weight: bold;
+      color: #fff;
+    }
+
+    .result-sub-txt {
+      font-size: 0.72rem;
+      color: var(--text-sub);
+    }
+
+    .card-dmg-list {
+      margin-top: 8px;
+      border-top: 1px solid #1e293b;
+      padding-top: 6px;
+    }
+
+    .card-dmg-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.75rem;
+      padding: 4px 0;
+      border-bottom: 1px dashed #1e293b;
+      align-items: center;
+    }
+
+    .card-dmg-row:last-child {
+      border-bottom: none;
+    }
+
+    /* Table Styles */
+    .stat-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.75rem;
+    }
+
+    .stat-table th, .stat-table td {
+      padding: 5px 3px;
+      text-align: center;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .stat-table th:first-child, .stat-table td:first-child {
+      text-align: left;
+      font-weight: normal;
+      color: var(--text-sub);
+      width: 44%;
+    }
+
+    .stat-table th.self-header { color: var(--self-color); width: 28%; }
+    .stat-table th.enemy-header { color: var(--enemy-color); width: 28%; }
+
+    .stat-input {
+      width: 100%;
+      background: var(--card-inner);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 3px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      text-align: right;
+    }
+
+    .stat-input:focus {
+      border-color: var(--accent-cyan);
+      outline: none;
+    }
+
+    .toggle-section-btn {
+      background: transparent;
+      border: 1px solid #334155;
+      color: var(--text-sub);
+      border-radius: 4px;
+      font-size: 0.7rem;
+      padding: 2px 6px;
+      cursor: pointer;
+    }
+
+    .unit-switch-btn {
+      background: #1e293b;
+      border: 1px solid var(--accent-cyan);
+      color: var(--accent-cyan);
+      border-radius: 4px;
+      font-size: 0.7rem;
+      padding: 2px 6px;
+      cursor: pointer;
+      margin-left: 6px;
+    }
+
+    .calc-btn {
+      width: 100%;
+      background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan));
+      color: #fff;
+      border: none;
+      padding: 10px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: bold;
+      cursor: pointer;
+      margin-top: 8px;
+    }
+
+    /* Footer */
+    footer {
+      margin-top: 24px;
+      text-align: center;
+      font-size: 0.8rem;
+      color: var(--text-sub);
+    }
+
+    footer a {
+      color: var(--accent-cyan);
+      text-decoration: none;
+      font-weight: bold;
+      transition: color 0.2s ease;
+    }
+
+    footer a:hover {
+      color: var(--accent-blue);
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <h1>Digimon UP ダメージシミュレーター</h1>
+  </header>
+
+  <!-- 1. 基本・コンボ・反撃ダメージ試算 (自分 ➔ 相手) -->
+  <div class="card">
+    <div class="card-title">
+      <span>⚔️ 通常・コンボ・反撃 試算 (自分 ➔ 相手)</span>
+      <div>
+        <button class="unit-switch-btn" id="unit-toggle-btn" onclick="toggleUnitMode()">単位: K/M/G</button>
+        <span id="evade-info-badge" style="font-size:0.7rem; color:var(--accent-red); font-weight:normal; margin-left:6px;">相手回避率: 0.0%</span>
+      </div>
+    </div>
+
+    <div class="attack-types-grid">
+      <!-- 通常攻撃 -->
+      <div class="attack-card normal">
+        <div class="attack-card-header">
+          <span>🗡️ 通常攻撃</span>
+          <span style="font-size:0.68rem; color:var(--accent-green);">1ヒット</span>
+        </div>
+        <div class="attack-card-dmg" id="norm-expected">0</div>
+        <div class="attack-card-sub">
+          通常時: <b id="norm-val">0</b><br>
+          会心時: <b id="norm-crit">0</b><br>
+          (会心率: <span id="norm-crit-rate">0.0%</span>)
+        </div>
+      </div>
+
+      <!-- コンボ攻撃 -->
+      <div class="attack-card combo">
+        <div class="attack-card-header">
+          <span>⚡ コンボ攻撃</span>
+          <span style="font-size:0.68rem; color:var(--accent-gold);" id="combo-rate-header">発動 0.0%</span>
+        </div>
+        <div class="attack-card-dmg" id="combo-expected">0</div>
+        <div class="attack-card-sub">
+          通常時: <b id="combo-val">0</b><br>
+          会心時: <b id="combo-crit">0</b><br>
+          (会心率: <span id="combo-crit-rate">0.0%</span>)
+        </div>
+      </div>
+
+      <!-- 反撃攻撃 -->
+      <div class="attack-card counter">
+        <div class="attack-card-header">
+          <span>🛡️ 反撃攻撃</span>
+          <span style="font-size:0.68rem; color:var(--accent-purple);" id="counter-rate-header">発動 0.0% (必中)</span>
+        </div>
+        <div class="attack-card-dmg" id="counter-expected">0</div>
+        <div class="attack-card-sub">
+          通常時: <b id="counter-val">0</b><br>
+          会心時: <b id="counter-crit">0</b><br>
+          (会心率: <span id="counter-crit-rate">0.0%</span>)
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. スキルカード 5枚セットエリア -->
+  <div class="card">
+    <div class="card-title">
+      <span>🃏 スキルカード (5枠)</span>
+      <span style="font-size:0.7rem; color:var(--text-sub); font-weight:normal;">枠タップで個別画像変更</span>
+    </div>
+    
+    <div class="skill-slots-grid">
+      <!-- Slot 1 -->
+      <div class="skill-slot" id="slot-0">
+        <div class="skill-slot-header">#1</div>
+        <div class="card-preview-box" onclick="triggerCardUpload(0)">
+          <div class="card-preview-placeholder" id="placeholder-0">画像<br>選択</div>
+          <img class="card-preview-img" id="preview-img-0" style="display:none;" />
+        </div>
+        <input type="file" id="card-file-0" accept="image/*" style="display:none;" onchange="handleSingleCardUpload(0, event)" />
+        <input type="text" class="card-name-input" id="card-name-0" value="" placeholder="カード名" />
+        <input type="number" step="0.001" class="skill-val-input" id="card-dmg-0" value="0" placeholder="0%" onchange="runSimulation()" />
+      </div>
+
+      <!-- Slot 2 -->
+      <div class="skill-slot" id="slot-1">
+        <div class="skill-slot-header">#2</div>
+        <div class="card-preview-box" onclick="triggerCardUpload(1)">
+          <div class="card-preview-placeholder" id="placeholder-1">画像<br>選択</div>
+          <img class="card-preview-img" id="preview-img-1" style="display:none;" />
+        </div>
+        <input type="file" id="card-file-1" accept="image/*" style="display:none;" onchange="handleSingleCardUpload(1, event)" />
+        <input type="text" class="card-name-input" id="card-name-1" value="" placeholder="カード名" />
+        <input type="number" step="0.001" class="skill-val-input" id="card-dmg-1" value="0" placeholder="0%" onchange="runSimulation()" />
+      </div>
+
+      <!-- Slot 3 -->
+      <div class="skill-slot" id="slot-2">
+        <div class="skill-slot-header">#3</div>
+        <div class="card-preview-box" onclick="triggerCardUpload(2)">
+          <div class="card-preview-placeholder" id="placeholder-2">画像<br>選択</div>
+          <img class="card-preview-img" id="preview-img-2" style="display:none;" />
+        </div>
+        <input type="file" id="card-file-2" accept="image/*" style="display:none;" onchange="handleSingleCardUpload(2, event)" />
+        <input type="text" class="card-name-input" id="card-name-2" value="" placeholder="カード名" />
+        <input type="number" step="0.001" class="skill-val-input" id="card-dmg-2" value="0" placeholder="0%" onchange="runSimulation()" />
+      </div>
+
+      <!-- Slot 4 -->
+      <div class="skill-slot" id="slot-3">
+        <div class="skill-slot-header">#4</div>
+        <div class="card-preview-box" onclick="triggerCardUpload(3)">
+          <div class="card-preview-placeholder" id="placeholder-3">画像<br>選択</div>
+          <img class="card-preview-img" id="preview-img-3" style="display:none;" />
+        </div>
+        <input type="file" id="card-file-3" accept="image/*" style="display:none;" onchange="handleSingleCardUpload(3, event)" />
+        <input type="text" class="card-name-input" id="card-name-3" value="" placeholder="カード名" />
+        <input type="number" step="0.001" class="skill-val-input" id="card-dmg-3" value="0" placeholder="0%" onchange="runSimulation()" />
+      </div>
+
+      <!-- Slot 5 -->
+      <div class="skill-slot" id="slot-4">
+        <div class="skill-slot-header">#5</div>
+        <div class="card-preview-box" onclick="triggerCardUpload(4)">
+          <div class="card-preview-placeholder" id="placeholder-4">画像<br>選択</div>
+          <img class="card-preview-img" id="preview-img-4" style="display:none;" />
+        </div>
+        <input type="file" id="card-file-4" accept="image/*" style="display:none;" onchange="handleSingleCardUpload(4, event)" />
+        <input type="text" class="card-name-input" id="card-name-4" value="" placeholder="カード名" />
+        <input type="number" step="0.001" class="skill-val-input" id="card-dmg-4" value="0" placeholder="0%" onchange="runSimulation()" />
+      </div>
+    </div>
+
+    <!-- 一括アップロードボタン -->
+    <div style="margin-top: 10px; display: flex; gap: 8px;">
+      <button class="upload-btn" style="flex: 1; text-align: center;" onclick="document.getElementById('batch-card-input').click()">
+        📁 カード5枚を一括アップロード & 自動認識
+      </button>
+      <input type="file" id="batch-card-input" accept="image/*" multiple style="display:none;" onchange="handleBatchCardUpload(event)" />
+    </div>
+    
+    <div class="progress-bar" id="card-progress-bar">
+      <div class="progress-bar-fill" id="card-progress-fill"></div>
+    </div>
+    <div id="card-ocr-status" style="font-size:0.75rem; color:var(--accent-gold); text-align:center; margin-top:4px;"></div>
+  </div>
+
+  <!-- 3. スキルダメージ結果表示 -->
+  <div class="card">
+    <div class="card-title">
+      <span>✨ スキルダメージ試算 (自分 ➔ 相手)</span>
+    </div>
+
+    <!-- スキル1サイクル合計 -->
+    <div class="result-section" style="border-left: 4px solid var(--accent-cyan);">
+      <div class="result-header">
+        <span style="font-size: 0.85rem; font-weight: bold; color: var(--accent-cyan);">5枚合計 1サイクル期待値</span>
+        <span class="result-dmg-val" id="total-cycle-dmg">0</span>
+      </div>
+      <div class="result-sub-txt" id="total-cycle-sub">通常合計: 0 / 会心合計: 0 (会心率 0.0%)</div>
+    </div>
+
+    <!-- 各カード別ダメージ内訳 -->
+    <div class="card-dmg-list" id="card-breakdown-list">
+      <!-- 動的挿入 -->
+    </div>
+
+    <button class="calc-btn" onclick="runSimulation()">再計算する</button>
+  </div>
+
+  <!-- 4. 詳細ステータス (OCR / 手動) -->
+  <div class="card">
+    <div class="card-title">
+      <span>📊 詳細ステータス (自分 / 相手)</span>
+      <button class="toggle-section-btn" onclick="toggleStatTable()">開閉</button>
+    </div>
+
+    <div class="upload-box" style="margin-bottom: 8px;" onclick="document.getElementById('stat-file-input').click();">
+      <div style="font-size: 0.8rem;">📸 ステータス画面のスクショを読み取る</div>
+      <input type="file" id="stat-file-input" accept="image/*" multiple onchange="handleStatUpload(event)" />
+    </div>
+    <div id="stat-ocr-status" style="font-size:0.75rem; color:var(--accent-gold); text-align:center; margin-bottom:6px;"></div>
+
+    <div id="stat-table-wrapper" style="display: block;">
+      <table class="stat-table">
+        <thead>
+          <tr>
+            <th>項目</th>
+            <th class="self-header">自分</th>
+            <th class="enemy-header">相手</th>
+          </tr>
+        </thead>
+        <tbody id="stat-table-body">
+          <!-- JSで動的生成 -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- フッター: 制作者リンク -->
+  <footer>
+    制作者: ぽっぽ (<a href="https://x.com/Poppo_DIGIMON" target="_blank" rel="noopener noreferrer">@Poppo_DIGIMON</a>)
+  </footer>
+</div>
+
+<script>
+// 表示単位切り替え (true: K/M/G/T省略表示, false: フル数値表示)
+let useCompactUnits = true;
+
+function toggleUnitMode() {
+  useCompactUnits = !useCompactUnits;
+  document.getElementById('unit-toggle-btn').innerText = useCompactUnits ? '単位: K/M/G' : '単位: 全桁表示';
+  runSimulation();
+}
+
+// 数値フォーマッター関数 (K, M, G, T)
+function formatNumber(num) {
+  if (num === null || num === undefined || isNaN(num)) return '0';
+  const n = Math.floor(num);
+  if (!useCompactUnits) {
+    return n.toLocaleString();
+  }
+  
+  const abs = Math.abs(n);
+  if (abs >= 1e12) {
+    return (n / 1e12).toFixed(2).replace(/\.00$/, '') + 'T';
+  } else if (abs >= 1e9) {
+    return (n / 1e9).toFixed(2).replace(/\.00$/, '') + 'G';
+  } else if (abs >= 1e6) {
+    return (n / 1e6).toFixed(2).replace(/\.00$/, '') + 'M';
+  } else if (abs >= 1e3) {
+    return (n / 1e3).toFixed(2).replace(/\.00$/, '') + 'K';
+  }
+  return n.toLocaleString();
+}
+
+// 全ステータス項目定義
+const STAT_FIELDS = [
+  { key: 'atk', label: '攻撃力 (総合)', isPercent: false },
+  { key: 'def', label: '防御力 (総合)', isPercent: false },
+  { key: 'hp', label: '体力 (総合)', isPercent: false },
+  // Gate: 回避判定
+  { key: 'evade_rate', label: '回避率', isPercent: true },
+  { key: 'evade_rate_down', label: '回避率ダウン', isPercent: true },
+  // 会心ステータス
+  { key: 'crit_rate', label: 'クリティカル発生率', isPercent: true },
+  { key: 'crit_dmg', label: 'クリティカルダメージ', isPercent: true },
+  { key: 'crit_dmg_down', label: 'クリティカルダメージ軽減', isPercent: true },
+  { key: 'crit_dmg_up', label: 'クリティカルダメージアップ', isPercent: true },
+  { key: 'crit_dmg_resist', label: 'クリティカルダメージ耐性', isPercent: true },
+  // スキル会心ステータス
+  { key: 'skill_crit_rate', label: 'スキルクリティカル発生率', isPercent: true },
+  { key: 'skill_crit_dmg', label: 'スキルクリティカルダメージ', isPercent: true },
+  { key: 'skill_crit_dmg_down', label: 'スキルクリティカルダメージ軽減', isPercent: true },
+  // 全体軽減
+  { key: 'dmg_down', label: 'ダメージ軽減', isPercent: true },
+  // 通常攻撃
+  { key: 'normal_dmg', label: '通常攻撃ダメージ', isPercent: true },
+  { key: 'normal_dmg_down', label: '通常攻撃ダメージ軽減', isPercent: true },
+  { key: 'normal_dmg_up', label: '通常攻撃ダメージアップ', isPercent: true },
+  { key: 'normal_dmg_resist', label: '通常攻撃ダメージ耐性', isPercent: true },
+  // コンボ
+  { key: 'combo_rate', label: 'コンボ率', isPercent: true },
+  { key: 'combo_dmg', label: 'コンボダメージ', isPercent: true },
+  { key: 'combo_dmg_down', label: 'コンボダメージ軽減', isPercent: true },
+  { key: 'combo_dmg_up', label: 'コンボダメージアップ', isPercent: true },
+  { key: 'combo_dmg_resist', label: 'コンボダメージ耐性', isPercent: true },
+  // 反撃
+  { key: 'counter_rate', label: '反撃発生率', isPercent: true },
+  { key: 'counter_dmg', label: '反撃ダメージ', isPercent: true },
+  { key: 'counter_dmg_down', label: '反撃ダメージ軽減', isPercent: true },
+  { key: 'counter_dmg_up', label: '反撃ダメージアップ', isPercent: true },
+  { key: 'counter_dmg_resist', label: '反撃ダメージ耐性', isPercent: true },
+  // スキル
+  { key: 'skill_dmg', label: 'スキルダメージ', isPercent: true },
+  { key: 'skill_dmg_down', label: 'スキルダメージ軽減', isPercent: true },
+  { key: 'skill_dmg_up', label: 'スキルダメージアップ', isPercent: true },
+  { key: 'skill_dmg_resist', label: 'スキルダメージ耐性', isPercent: true }
+];
+
+function toggleStatTable() {
+  const w = document.getElementById('stat-table-wrapper');
+  w.style.display = (w.style.display === 'none') ? 'block' : 'none';
+}
+
+function renderTable() {
+  const tbody = document.getElementById('stat-table-body');
+  tbody.innerHTML = '';
+  STAT_FIELDS.forEach(f => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${f.label}${f.isPercent ? ' (%)' : ''}</td>
+      <td><input type="number" step="any" class="stat-input" id="self_${f.key}" value="0" placeholder="0" onchange="runSimulation()" /></td>
+      <td><input type="number" step="any" class="stat-input" id="enemy_${f.key}" value="0" placeholder="0" onchange="runSimulation()" /></td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function getStats() {
+  const self = {}, enemy = {};
+  STAT_FIELDS.forEach(f => {
+    const sVal = parseFloat(document.getElementById(`self_${f.key}`).value) || 0;
+    const eVal = parseFloat(document.getElementById(`enemy_${f.key}`).value) || 0;
+    self[f.key] = f.isPercent ? sVal / 100 : sVal;
+    enemy[f.key] = f.isPercent ? eVal / 100 : eVal;
+  });
+  return { self, enemy };
+}
+
+// 公式戦闘計算フロー (Confirmed Native Order)
+function calculateNativeHit(attacker, defender, attackType, skillCoefficient = 0) {
+  const atk = attacker.atk || 0;
+  const def = defender.def || 0;
+  if (atk <= 0) return { nonCrit: 0, crit: 0, critRate: 0, expected: 0, hitRate: 1.0 };
+
+  // Gate: Evade 判定 (Counter攻撃は回避バイパス)
+  const isCounter = (attackType === 'counter');
+  let hitRate = 1.0;
+  if (!isCounter) {
+    const effectiveEvade = Math.max(0.0, (defender.evade_rate || 0) - (attacker.evade_rate_down || 0));
+    hitRate = Math.max(0.0, 1.0 - effectiveEvade);
+  }
+
+  // 01: Final ATK -> 02: Defense Curve (D^2 / (D + Defense))
+  let d = (atk * atk) / (atk + def);
+
+  // 04: Matching attack-type layers
+  const dmgDownGlobal = defender.dmg_down || 0;
+  const typeDmg = attacker[`${attackType}_dmg`] || 0;
+  const typeDmgDown = defender[`${attackType}_dmg_down`] || 0;
+  const typeDmgUp = attacker[`${attackType}_dmg_up`] || 0;
+  const typeDmgResist = defender[`${attackType}_dmg_resist`] || 0;
+
+  d *= (1 + Math.max(0, typeDmg - typeDmgDown - dmgDownGlobal));
+  d *= (1 + Math.max(0, typeDmgUp - typeDmgResist));
+
+  // 05: Skill Branch
+  if (attackType === 'skill' && skillCoefficient > 0) {
+    d *= skillCoefficient;
+  }
+
+  // 08: Step Rounding Check
+  let nonCrit = Math.floor(d);
+  if (d > 0 && nonCrit === 0) nonCrit = 1;
+
+  // 07: Critical Damage Branch
+  let critRate = 0, critMult = 1.5;
+  if (attackType === 'skill') {
+    critRate = Math.min(1.0, Math.max(0.0, attacker.skill_crit_rate || 0));
+    critMult = 1.5 + Math.max(0, (attacker.skill_crit_dmg || 0) - (defender.skill_crit_dmg_down || 0));
+  } else {
+    critRate = Math.min(1.0, Math.max(0.0, attacker.crit_rate || 0));
+    const cBase = 1.5 + Math.max(0, (attacker.crit_dmg || 0) - (defender.crit_dmg_down || 0));
+    const cUp = 1 + Math.max(0, (attacker.crit_dmg_up || 0) - (defender.crit_dmg_resist || 0));
+    critMult = cBase * cUp;
+  }
+
+  let crit = Math.floor(d * critMult);
+  if (d * critMult > 0 && crit === 0) crit = 1;
+
+  const connectedExpected = nonCrit * (1 - critRate) + crit * critRate;
+  const expected = Math.floor(connectedExpected * hitRate);
+
+  return { nonCrit, crit, critRate, expected, hitRate };
+}
+
+function runSimulation() {
+  const { self, enemy } = getStats();
+
+  // 相手の有効回避率表示
+  const effectiveEnemyEvade = Math.max(0, (enemy.evade_rate || 0) - (self.evade_rate_down || 0)) * 100;
+  document.getElementById('evade-info-badge').innerText = `相手の有効回避率: ${effectiveEnemyEvade.toFixed(1)}%`;
+
+  // 1. 通常攻撃
+  const normRes = calculateNativeHit(self, enemy, 'normal');
+  document.getElementById('norm-expected').innerText = formatNumber(normRes.expected);
+  document.getElementById('norm-val').innerText = formatNumber(normRes.nonCrit);
+  document.getElementById('norm-crit').innerText = formatNumber(normRes.crit);
+  document.getElementById('norm-crit-rate').innerText = (normRes.critRate * 100).toFixed(1) + '%';
+
+  // 2. コンボ攻撃
+  const comboRes = calculateNativeHit(self, enemy, 'combo');
+  const comboProcRate = (self.combo_rate || 0) * 100;
+  document.getElementById('combo-rate-header').innerText = `発動 ${comboProcRate.toFixed(1)}%`;
+  document.getElementById('combo-expected').innerText = formatNumber(comboRes.expected);
+  document.getElementById('combo-val').innerText = formatNumber(comboRes.nonCrit);
+  document.getElementById('combo-crit').innerText = formatNumber(comboRes.crit);
+  document.getElementById('combo-crit-rate').innerText = (comboRes.critRate * 100).toFixed(1) + '%';
+
+  // 3. 反撃攻撃
+  const counterRes = calculateNativeHit(self, enemy, 'counter');
+  const counterProcRate = (self.counter_rate || 0) * 100;
+  document.getElementById('counter-rate-header').innerText = `発動 ${counterProcRate.toFixed(1)}% (必中)`;
+  document.getElementById('counter-expected').innerText = formatNumber(counterRes.expected);
+  document.getElementById('counter-val').innerText = formatNumber(counterRes.nonCrit);
+  document.getElementById('counter-crit').innerText = formatNumber(counterRes.crit);
+  document.getElementById('counter-crit-rate').innerText = (counterRes.critRate * 100).toFixed(1) + '%';
+
+  // 4. スキルカード 5枚計算
+  let totalExpected = 0;
+  let totalNonCrit = 0;
+  let totalCrit = 0;
+  
+  const listEl = document.getElementById('card-breakdown-list');
+  listEl.innerHTML = '';
+
+  for (let i = 0; i < 5; i++) {
+    const rawName = document.getElementById(`card-name-${i}`).value.trim();
+    const name = rawName || `スロット #${i+1}`;
+    const dmgPct = parseFloat(document.getElementById(`card-dmg-${i}`).value) || 0;
+
+    const res = calculateNativeHit(self, enemy, 'skill', dmgPct / 100);
+    totalExpected += res.expected;
+    totalNonCrit += res.nonCrit;
+    totalCrit += res.crit;
+
+    const row = document.createElement('div');
+    row.className = 'card-dmg-row';
+    row.innerHTML = `
+      <span><b>#${i+1} ${name}</b> (${dmgPct}%)</span>
+      <span><b style="color:#38bdf8;">${formatNumber(res.expected)}</b> <span style="font-size:0.68rem; color:#94a3b8;">(通常 ${formatNumber(res.nonCrit)} / 会心 ${formatNumber(res.crit)})</span></span>
+    `;
+    listEl.appendChild(row);
+  }
+
+  document.getElementById('total-cycle-dmg').innerText = formatNumber(totalExpected);
+  document.getElementById('total-cycle-sub').innerText = 
+    `通常合計: ${formatNumber(totalNonCrit)} / 会心合計: ${formatNumber(totalCrit)} (会心率 ${(self.skill_crit_rate*100).toFixed(1)}%)`;
+}
+
+// ----------------------------------------------------
+// OCR 処理: スキルカード中央下「◯◯%のダメージ」を抽出
+// ----------------------------------------------------
+function triggerCardUpload(index) {
+  document.getElementById(`card-file-${index}`).click();
+}
+
+async function handleSingleCardUpload(index, event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const preview = document.getElementById(`preview-img-${index}`);
+  const placeholder = document.getElementById(`placeholder-${index}`);
+  preview.src = URL.createObjectURL(file);
+  preview.style.display = 'block';
+  placeholder.style.display = 'none';
+
+  const statusEl = document.getElementById('card-ocr-status');
+  statusEl.innerText = `カード #${index + 1} を解析中...`;
+
+  await processCardImage(index, file);
+  statusEl.innerText = `カード #${index + 1} の読み取り完了！`;
+  runSimulation();
+}
+
+async function handleBatchCardUpload(event) {
+  const files = event.target.files;
+  if (!files || files.length === 0) return;
+
+  const count = Math.min(files.length, 5);
+  const statusEl = document.getElementById('card-ocr-status');
+  const pBar = document.getElementById('card-progress-bar');
+  const pFill = document.getElementById('card-progress-fill');
+  pBar.style.display = 'block';
+
+  for (let i = 0; i < count; i++) {
+    const file = files[i];
+    statusEl.innerText = `[${i+1}/${count}] カード解析中...`;
+
+    const preview = document.getElementById(`preview-img-${i}`);
+    const placeholder = document.getElementById(`placeholder-${i}`);
+    preview.src = URL.createObjectURL(file);
+    preview.style.display = 'block';
+    placeholder.style.display = 'none';
+
+    await processCardImage(i, file);
+    pFill.style.width = `${((i + 1) / count) * 100}%`;
+  }
+
+  statusEl.innerText = '✅ カード全枠の読み取り完了！';
+  runSimulation();
+}
+
+async function processCardImage(slotIndex, file) {
+  const worker = await Tesseract.createWorker('jpn');
+  const ret = await worker.recognize(file);
+  await worker.terminate();
+
+  const text = ret.data.text;
+  
+  const dmgMatch = text.match(/([0-9]{1,4}(?:,[0-9]{3})*(?:\.[0-9]+)?)\s*%/);
+  if (dmgMatch) {
+    const specificMatch = text.match(/([0-9]{1,4}(?:,[0-9]{3})*(?:\.[0-9]+)?)\s*%\s*(?:の|ノ)?\s*ダメージ/);
+    const chosenMatch = specificMatch ? specificMatch[1] : dmgMatch[1];
+    const val = parseFloat(chosenMatch.replace(/,/g, ''));
+    if (!isNaN(val)) {
+      document.getElementById(`card-dmg-${slotIndex}`).value = val.toFixed(3);
+    }
+  }
+
+  const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+  for (let l of lines) {
+    if (!l.includes('ボーナス') && !l.includes('攻撃力') && !l.includes('ダメージ') && !l.includes('Lv') && l.length >= 2) {
+      document.getElementById(`card-name-${slotIndex}`).value = l.replace(/[^\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Han}a-zA-Z0-9!！]/gu, '');
+      break;
+    }
+  }
+}
+
+// ステータス画面のOCR
+async function handleStatUpload(event) {
+  const files = event.target.files;
+  if (!files || files.length === 0) return;
+
+  const statusEl = document.getElementById('stat-ocr-status');
+  statusEl.innerText = `ステータス解析中 (${files.length}枚)...`;
+
+  const worker = await Tesseract.createWorker('jpn');
+  for (let file of files) {
+    const ret = await worker.recognize(file);
+    parseStatOCR(ret.data.lines);
+  }
+  await worker.terminate();
+
+  statusEl.innerText = '✅ ステータス反映完了！';
+  runSimulation();
+}
+
+function parseStatOCR(lines) {
+  lines.forEach(line => {
+    const text = line.text.replace(/\s+/g, '');
+    STAT_FIELDS.forEach(f => {
+      if (text.includes(f.label.split(' ')[0])) {
+        const matches = text.match(/(\d{1,3}(,\d{3})*(\.\d+)?%?)/g);
+        if (matches && matches.length >= 2) {
+          const sVal = parseFloat(matches[0].replace(/,/g, '').replace('%', ''));
+          const eVal = parseFloat(matches[1].replace(/,/g, '').replace('%', ''));
+          if (!isNaN(sVal)) document.getElementById(`self_${f.key}`).value = sVal;
+          if (!isNaN(eVal)) document.getElementById(`enemy_${f.key}`).value = eVal;
+        }
+      }
+    });
+  });
+}
+
+window.onload = () => {
+  renderTable();
+  runSimulation();
+};
+</script>
+</body>
+</html>
